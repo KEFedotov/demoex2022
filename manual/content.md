@@ -175,4 +175,4 @@
     (config-router)# passive-interface g2
 
 
-[На главную](../README.md)
+[На главную](../index.md)
