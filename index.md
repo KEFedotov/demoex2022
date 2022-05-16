@@ -2,5 +2,5 @@
 
 ## Содержание
 
-1. [Методичка по настройке](./manual/readme.md)
+1. [Методичка по настройке](./manual/content.md)
 2. [Проверка](./autocheck/readme.md)
