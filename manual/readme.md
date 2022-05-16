@@ -92,7 +92,6 @@
     (config-if)# ip nat inside
 
 ## Настройка защищенного туннеля
-### Вариант 1 (GRE over IPsec)
 
 ##### Настройка IPsec
 
@@ -127,10 +126,7 @@
 
 **Phase 2**
 
-    (config)# crypto ipsec transform-set TS esp-aes esp-sha256-hmac
-    (cfg-crypto-trans)# mode tunnel
-    (config)# crypto ipsec profile VPN
-    (ipsec-profile)# set transform-set TS
+Абсолютно идентично RTR-L -> Phase 2
 
 ##### Настройка GRE
 
@@ -150,9 +146,6 @@
     (config-if)# tunnel destination 4.4.4.100
     (config-if)# tunnel protection ipsec profile VPN
 
-### Вариант 2 (IPsec)
-
-Будет чуть позже
 
 ## Настройка правильной маршрутизации
 
