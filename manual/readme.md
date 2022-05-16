@@ -3,8 +3,9 @@
 
 ### Windows (Server & Desktop)
 
-Вариант 1. Графические утилиты
-Вариант 2. PowerShell (от администратора):
+**Вариант 1.** Графические утилиты
+
+**Вариант 2.** PowerShell (от администратора):
 
     > Rename-Computer -NewName <name> | shutdown /r /t 0
 
@@ -20,8 +21,9 @@
 
 ### Windows (Server & Desktop)
 
-Вариант 1. Графические утилиты
-Вариант 2. PowerShell (от администратора):
+**Вариант 1.** Графические утилиты
+
+**Вариант 2.** PowerShell (от администратора):
     
     > Get-NetAdapter    # Ищем нужный адаптер и его индекс (столбец ifindex)
     > New-NetIPAddress -IPAddress <ip> -DefaultGateway <gw> -PrefixLength <pl> -InterfaceIndex <ifindex>
