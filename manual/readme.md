@@ -167,5 +167,41 @@
     (config-router)# network 10.10.10.0 0.0.0.3 area 0
     (config-router)# passive-interface g2
 
+## Настройка ACL на RTR-L
+
+    (config)# ip access-list extended SERVICES
+    (config-ext-nacl)# permit gre any any
+    (config-ext-nacl)# permit esp any any
+    (config-ext-nacl)# permit icmp any any
+    (config-ext-nacl)# permit ospf any any
+    (config-ext-nacl)# permit tcp any host 4.4.4.100 eq 53 www 443 2222
+    (config-ext-nacl)# permit udp any host 4.4.4.100 eq 53
+    (config-ext-nacl)# permit udp any eq 500 any eq 500
+    (config)# interface g1
+    (config-if)# ip access-group SERVICES in
+
+## Настройка ACL на RTR-R
+
+    (config)# ip access-list extended SERVICES
+    (config-ext-nacl)# permit gre any any
+    (config-ext-nacl)# permit esp any any
+    (config-ext-nacl)# permit icmp any any
+    (config-ext-nacl)# permit ospf any any
+    (config-ext-nacl)# permit tcp any host 5.5.5.100 eq www 443 2244
+    (config-ext-nacl)# permit udp any eq 500 any eq 500
+    (config)# interface g1
+    (config-if)# ip access-group SERVICES in
+
+## Настройка ssh для LEFT
+
+**На WEB-L должен быть установлен OpenSSH (в т.ч. если это WindowsServer)**
+
+    (config)# ip nat inside source static tcp 192.168.100.100 22 4.4.4.100 2222 extendable
+
+## Настройка ssh для RIGHT
+
+**На WEB-R должен быть установлен OpenSSH (в т.ч. если это WindowsServer)**
+
+    (config)# ip nat inside source static tcp 172.16.100.100 22 5.5.5.100 2244 extendable
 
 [На главную](../README.md)
