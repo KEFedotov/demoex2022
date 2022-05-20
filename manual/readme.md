@@ -225,14 +225,8 @@
             type master;
             file "/etc/bind/db.demo.wsr";
             allow-query { any; };
+            allow-transfer { 4.4.4.100; };
         };
-
-        zone "int.demo.wsr" {
-            type master;
-            file "/etc/bind/db.int.demo.wsr";
-            allow-query { any; };
-            allow-transfer { 4.4.4.100/32; }; // внешний адрес rtr-l
-        }
 
 2. Для упрощения копируем /etc/bind/db.empty в /etc/bind/db.demo.wsr
 3. Содержимое /etc/bind/db.demo.wsr
@@ -247,7 +241,9 @@
         )
         ;
         @   IN  NS  isp
-
+        int IN  NS  srv.int
+        
+        srv.int IN  A   4.4.4.100
         isp IN  A   3.3.3.1
         www IN  A   4.4.4.100
         www IN  A   5.5.5.100
