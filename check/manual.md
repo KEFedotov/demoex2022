@@ -234,26 +234,31 @@ Traceroute успешен **И** не содержит IP-адресов ISP -> 
 
 
 # C1 Инфраструктурные службы
+
+Во всех аспектах, связанных с DNS, если проверка путём резолвинга запускается с WinServer - используем Resolve-DnsName _name_ -DnsOnly, если с Linux - dig _name_. Струкутра того, что ищем в выводе - почти идентична
+
+**На Linux должен быть установлен dnsutils**
+
 ## O1 DNS первого уровня настроен в соответствии с заданием
 
-С CLI запускаем проверку машин зоны
+С ISP запускаем проверку машин зоны 
 
-    > nslookup isp.demo.wsr
-    > nslookup www.demo.wsr
-    > nslookup internet.demo.wsr
+    # dig isp.demo.wsr
+    # dig www.demo.wsr
+    # dig internet.demo.wsr
 
 Структура ответа:
 
-    ... : isp.demo.wsr
-    address: 3.3.3.1
-
-    ... : www.demo.wsr
-    addresses: 5.5.5.100
-               4.4.4.100
-
-    ... : isp.demo.wsr
-    address: 3.3.3.1
-    aliases: internet.demo.wsr
+    ;; ANSWER SECTION:
+    isp.demo.wsr.   ... IN  A   3.3.3.1
+    
+    ;; ANSWER SECTION:
+    www.demo.wsr.   ... IN  A   4.4.4.100
+    www.demo.wsr.   ... IN  A   5.5.5.100
+    
+    ;; ANSWER SECTION:
+    internet.demo.wsr.   ... IN  CNAME   isp.demo.wsr.
+    isp.demo.wsr.   ... IN  A   3.3.3.1
 
 ### Интерпретация
 
@@ -261,6 +266,97 @@ Traceroute успешен **И** не содержит IP-адресов ISP -> 
 
 В любом другом случае -> **C1.O1 FAILED**
 
+## O2 DNS второго уровня настроен в соответствии с заданием
 
+С SRV запускаем проверку машин зоны
 
+    > Resolve-DnsName -Name srv.int.demo.wsr -DnsOnly
+    > Resolve-DnsName -Name web-l.int.demo.wsr -DnsOnly
+    > Resolve-DnsName -Name web-r.int.demo.wsr -DnsOnly
+    > Resolve-DnsName -Name rtr-l.int.demo.wsr -DnsOnly
+    > Resolve-DnsName -Name rtr-r.int.demo.wsr -DnsOnly
+    > Resolve-DnsName -Name dns.int.demo.wsr -DnsOnly
+    > Resolve-DnsName -Name ntp.int.demo.wsr -DnsOnly
+
+Структура ответа
+
+    srv.int.demo.wsr    A   ... 192.168.100.200
+    web-l.int.demo.wsr    A   ... 192.168.100.100
+    web-r.int.demo.wsr    A   ... 172.16.100.100
+    rtr-l.int.demo.wsr    A   ... 192.168.100.254
+    rtr-r.int.demo.wsr    A   ... 172.16.100.254
+    dns.int.demo.wsr    CNAME   ... srv.int.demo.wsr
+    ntp.int.demo.wsr    CNAME   ... srv.int.demo.wsr
+
+### Интерпретация
+
+Если ВСЕ ответы соответствуют -> **C1.O2 PASSED**
+
+В любом другом случае -> **C1.O2 FAILED**
+
+## O3 DNS второго уровня обслуживает обратные зоны
+
+Прверка на SRV
+
+    > Resolve-DnsName -Name 192.168.100.100 -DnsOnly
+    > Resolve-DnsName -Name 192.168.100.200 -DnsOnly
+    > Resolve-DnsName -Name 192.168.100.254 -DnsOnly
+    > Resolve-DnsName -Name 172.16.100.100 -DnsOnly
+    > Resolve-DnsName -Name 172.16.100.254 -DnsOnly
+
+Структура вывода
+    
+    100.100.168.192.in-addr.arpa    PTR ... web-l.int.demo.wsr
+    200.100.168.192.in-addr.arpa    PTR ... srv.int.demo.wsr
+    254.100.168.192.in-addr.arpa    PTR ... rtr-l.int.demo.wsr
+    100.100.16.172.in-addr.arpa    PTR ... web-r.int.demo.wsr
+    254.100.16.172.in-addr.arpa    PTR ... rtr-r.int.demo.wsr
+
+### Интерпретация
+
+Если ВСЕ ответы соответствуют -> **C1.O3 PASSED**
+
+В любом другом случае -> **C1.O3 FAILED**
+
+## O4 DNS-сервер ISP делегирует зону int.demo.wsr на SRV
+
+Проверка с ISP
+
+    # dig int.demo.wsr
+    
+Структура вывода
+
+    ;; AUTHORITY SECTION:
+    int.demo.wsr.   ... IN  NS   srv.int.demo.wsr
+    ...
+    ;; ADDITIONAL SECTION:
+    srv.int.demo.wsr.   ... IN  A   4.4.4.100 ; Адрес RTR-L!!!
+
+### Интерпретация
+
+Если ответ соответствует -> **C1.O4 PASSED**
+
+В любом другом случае -> **C1.O4 FAILED**
+
+## O5 CLI использует DNS-сервер ISP по умолчанию
+
+Проверка на CLI
+
+    > Get-DnsClientServerAddress
+
+Структура вывода
+
+    Ethernet    ... IPv4    {3.3.3.1}   //IP ISP
+
+### Интерпретация
+
+Если ответ соответствует -> **C1.O5 PASSED**
+
+В любом другом случае -> **C1.O5 FAILED**
+
+## O6 SRV обслуживает рекурсивные запросы от внутренних машин
+
+Проверка с WEB-L (или WEB-R)
+
+    #dig
 [На главную](../README.md)
