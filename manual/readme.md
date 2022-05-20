@@ -224,6 +224,7 @@
         forwarders {
             4.4.4.100;
         };
+        allow-recursion { none; };
 
 1. Содержимое /etc/bind/named.conf.local
 
@@ -261,25 +262,6 @@
     
 
 ## Настройка DNS второго слоя
-### Настройка на ISP (Debian 11)
-
-1. Для упрощения копируем /etc/bind/db.empty в /etc/bind/db.int.demo.wsr
-2. Содержимое /etc/bind/db.int.demo.wsr
-
-        $TTL    604800  ; не трогаем
-        @   IN  SOA int.demo.wsr.   root.int.demo.wsr.  (
-                    2           ; не трогаем
-                    604800      ; не трогаем
-                    86400       ; не трогаем
-                    2419200     ; не трогаем
-                    604800      ; не трогаем
-        )
-        ;
-        @   IN  NS  isp
-        @   IN  NS  srv
-
-        isp IN  A   3.3.3.1
-        srv IN  A   4.4.4.100
 
 ### Настройка на SRV (Windows Server)
 
