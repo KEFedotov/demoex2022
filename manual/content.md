@@ -346,8 +346,8 @@
 
 2. Прокидываем порт на RTR-L
 
-    (config)# ip nat inside source static tcp 192.168.100.200 53 4.4.4.100 53 extendable
-    (config)# ip nat inside source static udp 192.168.100.200 53 4.4.4.100 53 extendable
+        (config)# ip nat inside source static tcp 192.168.100.200 53 4.4.4.100 53 extendable
+        (config)# ip nat inside source static udp 192.168.100.200 53 4.4.4.100 53 extendable
 
 
 [На главную](../index.md)
