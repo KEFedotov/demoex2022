@@ -232,4 +232,35 @@ Traceroute успешен **И** не содержит IP-адресов ISP -> 
 
 В любом другом случае -> **B1.11 FAILED**
 
+
+# C1 Инфраструктурные службы
+## O1 DNS первого уровня настроен в соответствии с заданием
+
+С CLI запускаем проверку машин зоны
+
+    > nslookup isp.demo.wsr
+    > nslookup www.demo.wsr
+    > nslookup internet.demo.wsr
+
+Структура ответа:
+
+    ... : isp.demo.wsr
+    address: 3.3.3.1
+
+    ... : www.demo.wsr
+    addresses: 5.5.5.100
+               4.4.4.100
+
+    ... : isp.demo.wsr
+    address: 3.3.3.1
+    aliases: internet.demo.wsr
+
+### Интерпретация
+
+Если ВСЕ три ответа соответствуют -> **C1.O1 PASSED**
+
+В любом другом случае -> **C1.O1 FAILED**
+
+
+
 [На главную](../README.md)
