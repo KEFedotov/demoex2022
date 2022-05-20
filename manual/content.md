@@ -176,6 +176,8 @@
     (config-ext-nacl)# permit ospf any any
     (config-ext-nacl)# permit tcp any host 4.4.4.100 eq 53 www 443 2222
     (config-ext-nacl)# permit udp any host 4.4.4.100 eq 53
+    (config-ext-nacl)# permit tcp any eq 53 host 4.4.4.100
+    (config-ext-nacl)# permit udp any eq 53 host 4.4.4.100
     (config-ext-nacl)# permit udp any eq 500 any eq 500
     (config)# interface g1
     (config-if)# ip access-group SERVICES in
@@ -203,6 +205,149 @@
 **На WEB-R должен быть установлен OpenSSH (в т.ч. если это WindowsServer)**
 
     (config)# ip nat inside source static tcp 172.16.100.100 22 5.5.5.100 2244 extendable
+
+
+# C1 Инфраструктурные службы
+
+## Настройка DNS первого слоя
+
+### Настройка на ISP (Debian 11)
+
+#### Предварительные требования
+
+- Должен быть установлен пакет bind9
+
+#### Настройка
+
+1. Содержимое /etc/bind/named.conf.local
+
+        zone "demo.wsr" {
+            type master;
+            file "/etc/bind/db.demo.wsr";
+            allow-query { any; };
+        };
+
+        zone "int.demo.wsr" {
+            type master;
+            file "/etc/bind/db.int.demo.wsr";
+            allow-query { any; };
+            allow-transfer { 4.4.4.100/32; }; // внешний адрес rtr-l
+        }
+
+2. Для упрощения копируем /etc/bind/db.empty в /etc/bind/db.demo.wsr
+3. Содержимое /etc/bind/db.demo.wsr
+
+        $TTL    604800  ; не трогаем
+        @   IN  SOA demo.wsr.   root.demo.wsr.  (
+                    2           ; не трогаем
+                    604800      ; не трогаем
+                    86400       ; не трогаем
+                    2419200     ; не трогаем
+                    604800      ; не трогаем
+        )
+        ;
+        @   IN  NS  isp
+
+        isp IN  A   3.3.3.1
+        www IN  A   4.4.4.100
+        www IN  A   5.5.5.100
+        internet    IN  CNAME   isp
+
+4. Перезапускаем сервис
+
+        systemctl restart named
+    
+
+## Настройка DNS второго слоя
+### Настройка на ISP (Debian 11)
+
+1. Для упрощения копируем /etc/bind/db.empty в /etc/bind/db.int.demo.wsr
+2. Содержимое /etc/bind/db.int.demo.wsr
+
+        $TTL    604800  ; не трогаем
+        @   IN  SOA int.demo.wsr.   root.int.demo.wsr.  (
+                    2           ; не трогаем
+                    604800      ; не трогаем
+                    86400       ; не трогаем
+                    2419200     ; не трогаем
+                    604800      ; не трогаем
+        )
+        ;
+        @   IN  NS  isp
+        @   IN  NS  srv
+
+        isp IN  A   3.3.3.1
+        srv IN  A   4.4.4.100
+
+### Настройка на SRV (Windows Server)
+
+##### Установка роли DNS
+
+**Вариант 1 (графический)**
+
+Диспетчер серверов -> Управление -> Добавить роли и компоненты
+
+В мастере на этапе "Роли сервера" выбрать "DNS-сервер"
+
+**Вариант 2 (posh, для умных)**
+
+    > Install-WindowsFeature -Name DNS -IncludeManagementTools
+
+##### НАстройка DNS
+
+**Вариант 1 (графический)**
+
+Всё через Средсва -> DNS
+
+**Вариант 2 (posh, для умных)**
+
+Создание зоны прямого просмотра
+
+    > Add-DnsServerPrimaryZone -Name "int.demo.wsr" -ZoneFile "int.demo.wsr.dns"
+
+Создание зоны обратного просмотра для 192.168.100.0/24
+
+    > Add-DnsServerPrimaryZone -NetworkId "192.168.100.0/24" -ZoneFile "168.192.dns"
+
+Создание зоны обратного просмотра для 172.16.100.0/24
+
+    > Add-DnsServerPrimaryZone -NetworkId "172.16.100.0/24" -ZoneFile "100.16.172.dns"
+
+Добавляем сервер пересылки
+
+    > Add-DnsServerForwarder -IPAddress 3.3.3.1
+
+Разрешаем рекурсивные запросы
+
+    > Set-DnsServerRecursion -Enable $true
+
+
+##### Добавление записей
+
+    > Add-DnsServerResourceRecordA -IPv4Address 192.168.100.200 -Name srv -ZoneName int.demo.wsr -CreatePtr
+    > Add-DnsServerResourceRecordA -IPv4Address 192.168.100.100 -Name web-l -ZoneName int.demo.wsr -CreatePtr
+    > Add-DnsServerResourceRecordA -IPv4Address 192.168.100.254 -Name rtr-l -ZoneName int.demo.wsr -CreatePtr
+    > Add-DnsServerResourceRecordA -IPv4Address 172.16.100.100 -Name web-r -ZoneName int.demo.wsr -CreatePtr
+    > Add-DnsServerResourceRecordA -IPv4Address 172.16.100.254 -Name rtr-r -ZoneName int.demo.wsr -CreatePtr
+    > Add-DnsServerResourceRecordCname -Name ntp -HostNameAlias srv.int.demo.wsr -ZoneName
+    > Add-DnsServerResourceRecordCname -Name dns -HostNameAlias srv.int.demo.wsr -ZoneName
+
+##### Донастройки
+
+1. На всех внутренних машинах указать ip SRV в качестве dns
+
+Если это Linux (быстрый способ, если стоит cloud-init, то работает только до перезагрузки. По хорошему - надо через файлы конфигурации интерфейсов):
+
+    # echo "nameserver 192.168.100.200" > /etc/resolv.conf
+
+Если Windows Server
+
+    > Set-DNSClientServerAddress –InterfaceIndex 4 –ServerAddresses 192.168.100.200
+
+2. Прокидываем порт на RTR-L
+
+    (config)# ip nat inside source static tcp 192.168.100.200 53 4.4.4.100 53 extendable
+    (config)# ip nat inside source static udp 192.168.100.200 53 4.4.4.100 53 extendable
 
 
 [На главную](../index.md)
