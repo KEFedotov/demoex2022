@@ -219,20 +219,21 @@
 
 #### Настройка
 
+0. Если ISP подключен к интернету, то правим /etc/bind/named.conf.options
+
+        forwarders {
+            4.4.4.100;
+        };
+        allow-recursion { none; };
+
 1. Содержимое /etc/bind/named.conf.local
 
         zone "demo.wsr" {
             type master;
             file "/etc/bind/db.demo.wsr";
             allow-query { any; };
+            allow-transfer { 4.4.4.100; };
         };
-
-        zone "int.demo.wsr" {
-            type master;
-            file "/etc/bind/db.int.demo.wsr";
-            allow-query { any; };
-            allow-transfer { 4.4.4.100/32; }; // внешний адрес rtr-l
-        }
 
 2. Для упрощения копируем /etc/bind/db.empty в /etc/bind/db.demo.wsr
 3. Содержимое /etc/bind/db.demo.wsr
@@ -247,7 +248,9 @@
         )
         ;
         @   IN  NS  isp
-
+        int IN  NS  srv.int
+        
+        srv.int IN  A   4.4.4.100
         isp IN  A   3.3.3.1
         www IN  A   4.4.4.100
         www IN  A   5.5.5.100
@@ -259,25 +262,6 @@
     
 
 ## Настройка DNS второго слоя
-### Настройка на ISP (Debian 11)
-
-1. Для упрощения копируем /etc/bind/db.empty в /etc/bind/db.int.demo.wsr
-2. Содержимое /etc/bind/db.int.demo.wsr
-
-        $TTL    604800  ; не трогаем
-        @   IN  SOA int.demo.wsr.   root.int.demo.wsr.  (
-                    2           ; не трогаем
-                    604800      ; не трогаем
-                    86400       ; не трогаем
-                    2419200     ; не трогаем
-                    604800      ; не трогаем
-        )
-        ;
-        @   IN  NS  isp
-        @   IN  NS  srv
-
-        isp IN  A   3.3.3.1
-        srv IN  A   4.4.4.100
 
 ### Настройка на SRV (Windows Server)
 
