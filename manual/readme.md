@@ -219,6 +219,12 @@
 
 #### Настройка
 
+0. Если ISP подключен к интернету, то правим /etc/bind/named.conf.options
+
+        forwarders {
+            4.4.4.100;
+        };
+
 1. Содержимое /etc/bind/named.conf.local
 
         zone "demo.wsr" {
