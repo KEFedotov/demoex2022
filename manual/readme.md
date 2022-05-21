@@ -36,7 +36,7 @@
 
 **Вариант 1 (рекомендуемый)**
 
-Редактируем /etc/network/interfaces.d/setup или /etc/network/interfaces (если setup нет). Настройка интерфейса одинаковая:
+Редактируем /etc/network/interfaces:
 
     auto <ifname>
     iface <ifname> inet static
@@ -221,10 +221,7 @@
 
 0. Если ISP подключен к интернету, то правим /etc/bind/named.conf.options
 
-        forwarders {
-            4.4.4.100;
-        };
-        allow-recursion { none; };
+        allow-recursion { any; };
 
 1. Содержимое /etc/bind/named.conf.local
 
@@ -332,6 +329,60 @@
 
         (config)# ip nat inside source static tcp 192.168.100.200 53 4.4.4.100 53 extendable
         (config)# ip nat inside source static udp 192.168.100.200 53 4.4.4.100 53 extendable
+
+## Настройка синхронизации времени (первый уровень)
+
+Настройка происходит на ISP
+
+**Если ISP - Linux - должен быть установлен пакет chrony**
+
+Редактируем /etc/chrony/chrony.conf
+
+- Удаляем все записи `peer`, `pool`, `server`
+- Добавляем записи
+  - server 127.0.0.1 iburst trust
+  - local stratum 4
+  - allow 4.4.4.100
+  - allow 3.3.3.10
+- Перезапускаем сервис (systemctl restart chronyd)
+- Проверяем, что стратум верный (chronyc tracking)
+
+Настройка CLI для синхронизации с ISP
+
+**Вариант 1 (графика)**
+
+Панель управления -> Часы и регион -> Дата и время -> Время по интернету -> Изменить параметры. Устанавливаем IP ISP -> Обновить сейчас -> OK
+
+**Вариант 2 (posh, для умных)**
+
+    > Start-Service w32time
+    > w32tm /config /syncfromflags:manual /manualpeerlist:"3.3.3.1" //перед кавычками с IP НЕ ДОЛЖНО БЫТЬ ПРОБЕЛАw32tm
+    > Restart-Service w32time
+    > w32tm /resync
+
+## Настройка синхронизации времени (второй уровень)
+
+**На rtr-r добавить правило в ACL**
+
+    (config)# ip access-list extended SERVICES
+    (config-ext-nacl)# permit udp any eq ntp host 4.4.4.100
+
+**На SRV (если windows)**
+
+    > Start-Service w32time
+    > w32tm /config /syncfromflags:manual /manualpeerlist:"4.4.4.1"
+    > w32tm /config /reliable:yes
+    > Restart-Service w32time
+    > w32tm /resync
+
+**На srv (если linux)**
+
+Добавляем записи в /etc/chrony/chrony.conf
+  - server 4.4.4.1 iburst trust
+  - allow 192.168.100.0/24
+  - allow 172.16.100.0/24
+  
+Перезапускаем chronyd
 
 
 
