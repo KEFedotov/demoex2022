@@ -288,7 +288,7 @@
 
 Создание зоны обратного просмотра для 192.168.100.0/24
 
-    > Add-DnsServerPrimaryZone -NetworkId "192.168.100.0/24" -ZoneFile "168.192.dns"
+    > Add-DnsServerPrimaryZone -NetworkId "192.168.100.0/24" -ZoneFile "100.168.192.dns"
 
 Создание зоны обратного просмотра для 172.16.100.0/24
 
