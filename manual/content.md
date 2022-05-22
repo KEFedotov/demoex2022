@@ -221,6 +221,7 @@
 
 0. Если ISP подключен к интернету, то правим /etc/bind/named.conf.options
 
+        dnssec-validation no;
         allow-recursion { any; };
 
 1. Содержимое /etc/bind/named.conf.local
@@ -288,7 +289,7 @@
 
 Создание зоны обратного просмотра для 192.168.100.0/24
 
-    > Add-DnsServerPrimaryZone -NetworkId "192.168.100.0/24" -ZoneFile "100.168.192.dns"
+    > Add-DnsServerPrimaryZone -NetworkId "192.168.100.0/24" -ZoneFile "168.192.dns"
 
 Создание зоны обратного просмотра для 172.16.100.0/24
 
@@ -551,5 +552,52 @@
     # mount -t cifs -o username=root,password=toor //192.168.100.200/share /opt/share
 
 Пробуем с клиента создать каталог. Проверяем на сервере, что он появился
+
+
+## Установка и настройка центра сертификации
+
+### на SRV (windows server)
+
+Установка центра сертификиции
+
+**Вариант 1 (графика)**
+
+Через добавление ролей и компонентов -> Службы сертификатов ... -> Центр сертификации
+
+После установки в верху ДС появится восклицательный знак, где попросит настроить центр
+
+В мастере:
+
+- Службы ролей: центр сертификации
+- Вариант установки: автономный
+- Тип ЦС: Корневой
+- Закрытый ключ: создать
+- Шифрование: по дефолту
+- Имя ЦС:
+  - Общее имя: по дефолту
+  - Суффикс: O=DEMO.WSR,C=RU
+- Срок действия: любой, не менее 500 дней
+- БД сертификатов:
+  - БД: C:\CertDB
+  - Журнал: C:\CertLog
+  
+Устанавливаем
+
+**Вариант 2 (posh)**
+
+    > Add-WindowsFeature ADCS-cert-authority -IncludeManagementTools
+    > Add-WindowsFeature RSAT-ADCS-mgmt -IncludeManagementTools
+    > Install-AdcsCertificationAuthority `
+        -CACommonName MyORG-CA `
+        -CAType EnterpriseRootCA `
+        -CryptoProviderName "RSA#Microsoft Software Key Storage Provider" `
+        -KeyLength 2048 `
+        -HashAlgorithmName SHA256 `
+        -ValidityPeriod Years `
+        -ValidityPeriodUnits 5 `
+        -DatabaseDirectory c:\CertDB `
+        -LogDirectory c:\CertLog `
+        -CADistinguishedNameSuffix "O=DEMO.WSR,C=RU"
+
 
 [На главную](../index.md)
