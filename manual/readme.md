@@ -221,8 +221,11 @@
 
 0. Если ISP подключен к интернету, то правим /etc/bind/named.conf.options
 
-        dnssec-validation no;
         allow-recursion { any; };
+
+На SRV, если он на Linux также надо добавить (или изменить)
+        
+        dsssec-validation no;
 
 1. Содержимое /etc/bind/named.conf.local
 
