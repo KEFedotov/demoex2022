@@ -36,7 +36,7 @@
 
 **Вариант 1 (рекомендуемый)**
 
-Редактируем /etc/network/interfaces.d/setup или /etc/network/interfaces (если setup нет). Настройка интерфейса одинаковая:
+Редактируем /etc/network/interfaces:
 
     auto <ifname>
     iface <ifname> inet static
@@ -221,10 +221,7 @@
 
 0. Если ISP подключен к интернету, то правим /etc/bind/named.conf.options
 
-        forwarders {
-            4.4.4.100;
-        };
-        allow-recursion { none; };
+        allow-recursion { any; };
 
 1. Содержимое /etc/bind/named.conf.local
 
@@ -333,5 +330,226 @@
         (config)# ip nat inside source static tcp 192.168.100.200 53 4.4.4.100 53 extendable
         (config)# ip nat inside source static udp 192.168.100.200 53 4.4.4.100 53 extendable
 
+## Настройка синхронизации времени (первый уровень)
+
+Настройка происходит на ISP
+
+**Если ISP - Linux - должен быть установлен пакет chrony**
+
+Редактируем /etc/chrony/chrony.conf
+
+- Удаляем все записи `peer`, `pool`, `server`
+- Добавляем записи
+  - server 127.0.0.1 iburst trust
+  - local stratum 4
+  - allow 4.4.4.100
+  - allow 3.3.3.10
+- Перезапускаем сервис (systemctl restart chronyd)
+- Проверяем, что стратум верный (chronyc tracking)
+
+Настройка CLI для синхронизации с ISP
+
+**Вариант 1 (графика)**
+
+Панель управления -> Часы и регион -> Дата и время -> Время по интернету -> Изменить параметры. Устанавливаем IP ISP -> Обновить сейчас -> OK
+
+**Вариант 2 (posh, для умных)**
+
+    > Start-Service w32time
+    > w32tm /config /syncfromflags:manual /manualpeerlist:"3.3.3.1" //перед кавычками с IP НЕ ДОЛЖНО БЫТЬ ПРОБЕЛАw32tm
+    > Restart-Service w32time
+    > w32tm /resync
+
+## Настройка синхронизации времени (второй уровень)
+
+**На rtr-r добавить правило в ACL**
+
+    (config)# ip access-list extended SERVICES
+    (config-ext-nacl)# permit udp any eq ntp host 4.4.4.100
+
+**На SRV (если windows)**
+
+    > Start-Service w32time
+    > w32tm /config /syncfromflags:manual /manualpeerlist:"4.4.4.1"
+    > w32tm /config /reliable:yes
+    > Restart-Service w32time
+    > w32tm /resync
+
+**На srv (если linux)**
+
+Добавляем записи в /etc/chrony/chrony.conf
+  - server 4.4.4.1 iburst trust
+  - allow 192.168.100.0/24
+  - allow 172.16.100.0/24
+  
+Перезапускаем chronyd
+
+## Настройка клиентов (внтуренних машин)
+
+### На WinServer
+
+Графика (описано выше для CLI) или
+
+    > Start-Service w32time
+    > w32tm /config /syncfromflags:manual /manualpeerlist:"192.168.100.200" //IP SRV
+    > Restart-Service w32time
+    > w32tm /resync
+
+### На Linux
+
+Добавляем запись в /etc/chrony/chrony.conf
+  
+- server 192.168.100.200 iburst
+- Перезапускаем chronyd
+
+### На Cisco
+
+    (config)# ntp server 192.168.100.200
+
+## Настройка SMB на SRV
+
+### Настройка на SRV (Windows Server)
+
+1. Настраиваем raid1
+
+**Вариант 1 (графика)**
+
+Выполнить -> mmc -> Ctrl+M -> Управление дисками
+
+Переводим диски в online (ПКМ по диску -> В сети, Инициализировать -> GPT)
+
+Создаем зеркало: ПКМ по пространству диска -> Создать зеркальный том -> Всё по подсказкам мастера (нужно будет воткнуть 2 диска)
+
+**Вариант 2 (diskpart)**
+
+    > diskpart
+    > list disk // проверяем наличие дисков и их номера
+    > select disk 1
+    > online disk
+    > attributes disk clear readonly
+    > convert gpt
+    > convert dynamic
+
+То же самое повторить с disk 2
+
+    > create volume mirror disk=1,2
+    > format fs=ntfs quick
+    > assign letter=R
+
+Готово
+
+2. Создание SMB шары
+
+Устанавливаем роль файлового сервера и диспетчер ресурсов
+
+**Вариант 1 (графика)**
+
+ДС -> Управление -> Добавить роли и компоненты -> Роли сервера -> Файловые службы...: файловый сервер, Диспетчер ресурсов
+
+**Вариант 2 (posh)**
+
+    > Install-WindowsFeature -Name FS-Resource-Manager -IncludeManagementTools // ФС подцепит сам
+
+Создаем шару
+
+**Вариант 1 (графика)**
+
+ДС -> Файловые службы и хранилища -> Общие ресурсы -> Клик по сцылке, Дальше по мастеру. На этапе "Общий ресурс" выбираем диск R. На этапе разрешения кликаем "Настройка разрешений"
+
+- на вкладке "Отправить" устанавливаем для "Все" полный доступ
+- на вкладке "Разрешения" добавляем для "Все" полный доступ
+- Отключаем наследование
+
+
+**Вариант 2 (posh)**
+        
+    > New-SmbShare -Name share -Path R:\shares -FullAccess "все" \\При EN локализации Everything
+
+
+### Настройка на SRV (Linux)
+
+1. Настраиваем raid1
+
+Должен быть установлен mdadm и/или lvm2
+
+**Вариант 1 (mdadm)** 
+
+    # mdadm --create /dev/md0 --level=1 --raid-devices=2 /dev/vdb /dev/vdc
+
+Создаем раздел
+
+    # fdisk /dev/md0
+    command (m for help): n
+    Дальше enter до победного
+    command (m for help): w
+
+Создаем файловую систему
+
+    # mkfs.ext4 /dev/md0p1
+
+Монтируем ФС
+
+    # mkdir /mnt/storage
+    # mount /dev/md0p1 /mnt/storage
+    # chmod -R a=rwx /mnt/storage
+
+Правим /etc/fstab (чтоб маунт после перезагрузки не отвалился)
+
+    /dev/md0p1 /mnt/storage ext4 defaults 0 0
+
+**Вариант 2(lvm)**
+
+Создаем физические тома LVM
+
+    # pvcreate /dev/vdb /dev/vdc
+
+Создаем группу томов
+
+    # vgcreate DS /dev/vdb /dev/vdc
+
+Создаем логический том типа зеркало
+
+    # lvcreate --type mirror --name lv-share -l 100%FREE DS
+
+Создаем ФС
+
+    # mkfs.ext4 /dev/DS/lv-share
+
+Монтируем
+
+    # mount /dev/DS/lv-share /mnt/storage
+
+Не забываем про chmod и /etc/fstab
+
+2. Создание SMB шары
+
+Должны быть установлены пакеты samba и smbclient
+
+Редактируем файл /etc/samba/smb.conf
+Удаляем всё, добавляем это:
+
+    [global]
+        workgroup = WORKGROUP
+        security = user
+        map to guest = bad user
+        wins support = no
+        dns proxy = no
+
+    [share]
+        path = /mnt/storage
+        guest ok = yes
+        force user = nobody
+        browsable = yes
+        writable = yes
+
+## Монтирование шары на WEB-L, WEB-R
+
+Создаем каталог /opt/share
+
+монтируем:
+
+    # mount -t cifs -o username=root,password=toor //192.168.100.200/share /opt/share
+
+Пробуем с клиента создать каталог. Проверяем на сервере, что он появился
 
 [На главную](../index.md)
