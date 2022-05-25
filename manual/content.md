@@ -602,5 +602,90 @@
         -LogDirectory c:\CertLog `
         -CADistinguishedNameSuffix "O=DEMO.WSR,C=RU"
 
+# D1 Инфраструктура веб-приложения
+
+**Решения на винде не будет, потому как я не знаю кому ваще может в голову прийти развертывать докерную инфру на ней в проде**
+
+**На Linux, пакеты с диска ставятся только при доступе в интернет (иначе зависимости не разрешаются)**
+
+## Базовая настройка без TLS
+
+Если правильно сделали DNS на ISP - всё ок, имя www.demo.wsr уже резолвится во внешние адреса платформ
+
+Далее следующее (пункты 1 и 2 прям прописаны в инструкции на диске):
+
+1. Устанавливаем образ с диска на WEB-L и WEB-R
+
+        # mount -o loop /dev/cdrom /media/cdrom 
+        # docker image load -i /media/cdrom/appdocker0.zip
+
+2. Запускаем (на WEB-L и WEB-R)
+
+        #  docker run -p 5000:5000 -d appdocker0:latest
+
+3. Предоставляем доступ к приложению с CLI. Тут несколько вариантов решений
+
+**Вариант 1. Проще некуда. Подходит, если не собираетесь возиться с TLS**
+
+На RTR-L и RTR-R
+
+Вырубаем http server иначе не даст пробросить 80 порт на приложение
+
+    (config)# no ip http server
+    (config)# ip nat inside source static tcp 192.168.100.100 5000 4.4.4.100 80 extendable //RTR-L
+    (config)# ip nat inside source static tcp 172.16.100.100 5000 5.5.5.100 80 extendable //RTR-R
+
+Проверяем с CLI в edge: http://www.demo.wsr. Если увидели писанину про юзера - победа
+
+**Вариант 2. Для IT-гуру, по человечески**
+
+3.1 На ISP настраиваем nginx как лоад балансер
+
+Чтоб не мудрить копипастим дефолтный конфиг в наш
+
+    # cp /etc/nginx/sites-available/default /etc/nginx/sites-available/demo.wsr
+
+Редачим созданный файл
+
+    upstream www.demo.wsr {
+        server 4.4.4.100:80 max_fails=2 fail_timeout=10s;
+        server 5.5.5.100:80 max_fails=2 fail_timeout=10s; 
+    }
+
+    server {
+        listen 80;
+
+        server_name www.demo.wsr;
+
+        location / {
+            proxy_pass http://www.demo.wsr;
+        }
+    }
+
+Делаем мягкоссылку на файл
+
+    # ln -s /etc/nginx/sites-available/demo.wsr /etc/nginx/sites-enable/demo.wsr
+
+Проверяем конфиг
+   
+    # nginx -t
+
+Перезапускаем сервер
+
+    # systemctl restart nginx
+
+3.2 На RTR-L и RTR-R
+
+Вырубаем http server иначе не даст пробросить 80 порт на приложение
+
+    (config)# no ip http server
+    (config)# ip nat inside source static tcp 192.168.100.100 5000 4.4.4.100 80 extendable //RTR-L
+    (config)# ip nat inside source static tcp 172.16.100.100 5000 5.5.5.100 80 extendable //RTR-R
+
+3.3 в зону DNS demo.wsr добавляем запись 
+
+    www IN  A   3.3.3.1
+
+Обязательно ДО остальных www
 
 [На главную](../index.md)
