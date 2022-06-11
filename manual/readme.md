@@ -689,4 +689,23 @@
 
 Обязательно ДО остальных www
 
+
+# Создание сертификатов на шинде
+
+## корневой сертификат
+
+    $cert = New-SelfSignedCertificate -Type Custom -KeySpec Signature `
+    -Subject "CN=RootCert,C=RU,O=DEMO.WSR" -KeyExportPolicy Exportable `
+    -HashAlgorithm sha256 -KeyLength 2048 `
+    -CertStoreLocation "Cert:\LocalMachine\My" -KeyUsageProperty Sign -KeyUsage CertSign
+
+## Сертификат с подписанчиком
+
+    New-SelfSignedCertificate -Type Custom -DnsName P2SChildCert -KeySpec Signature `
+    -Subject "CN=ChildCert,C=RU,O=DEMO.WSR" -KeyExportPolicy Exportable `
+    -HashAlgorithm sha256 -KeyLength 2048 `
+    -CertStoreLocation "Cert:\LocalMachine\My" `
+    -Signer $cert
+    
+ 
 [На главную](../README.md)
